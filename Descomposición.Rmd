@@ -1,0 +1,206 @@
+---
+title: "Descomposición"
+author: "José Luis Corona López"
+date: "2024-11-17"
+output: pdf_document
+---
+
+# Descomposición Multiplicativa
+
+# Introducción
+## Preparación de los datos
+
+```{r}
+# Taste Cola
+
+# Valores observados
+y <- c(189, 229, 249, 289, 260, 431,660,777,915,613,485,277,244,296,319,370,313,556,831,960,1152,759,
+      607,371,298,378,373,443,374,660,1004,1153,1388,904,715,441)
+t <- c(1:length(y))
+```
+
+
+```{r}
+# Transformamos los datos a una serie de tiempo
+Taste <- ts(y, start = c(2021, 1), frequency = 12)
+Taste
+
+Descomposición <- decompose(Taste, type = "m")
+Descomposición
+
+
+plot(Descomposición$x)
+lines(Descomposición$trend, col = "red")
+lines(Descomposición$seasonal * 450, col = "blue")
+lines(Descomposición$random * 450, col = "violet")
+```
+
+La línea negra representa las ventas observadas de Taste Cola. Se aprecia un patrón con picos muy marcados en los meses de verano y caídas pronunciadas al inicio y final de cada año. En conjunto, la serie muestra un crecimiento progresivo en el nivel general de ventas.
+
+La línea roja corresponde al componente de tendencia. Esta revela un aumento sostenido a lo largo del periodo, pasando de niveles cercanos a 450 unidades en 2021 hasta superar las 650 unidades hacia mediados de 2023, lo que confirma un crecimiento estructural de la demanda.
+
+La línea azul muestra la estacionalidad, que refleja variaciones regulares a lo largo del año. Los valores indican que los meses de verano concentran la mayor parte de las ventas, mientras que en invierno se presentan los niveles más bajos, lo que pone en evidencia un comportamiento estacional fuerte.
+
+Finalmente, la línea violeta representa el componente irregular o aleatorio. Sus fluctuaciones se mantienen cercanas a la unidad, lo que significa que los efectos no sistemáticos son relativamente pequeños y no alteran la tendencia ni la estacionalidad identificadas en la serie.
+
+# Desarrollo
+
+```{r}
+d <- y/Descomposición$seasonal
+
+mod1 <- lm(d ~ t)
+summary(mod1)
+```
+
+Al dividir la serie observada entre su componente estacional se elimina la estacionalidad y se obtiene una nueva serie que refleja únicamente la tendencia y las fluctuaciones aleatorias. Posteriormente, al ajustar una regresión lineal de esta serie desestacionalizada con respecto al tiempo, se busca aproximar la tendencia mediante una función lineal, de modo que pueda expresarse como:
+
+$$
+\frac{Y_t}{S_t} = T_t \times e_t
+$$
+
+
+$$
+T_t \approx \alpha + \beta t
+$$
+
+
+donde $\alpha$ representa el nivel inicial de la serie y $\beta$ la pendiente o ritmo de crecimiento de la tendencia a lo largo del tiempo.
+
+```{r}
+meses <- data.frame(t = c(37:48))
+
+pT <- predict(mod1, newdata = meses, interval = "predict", level =  0.95)[,1]
+
+B <- predict(mod1, newdata = meses, interval = "predict", level =  0.95)[,3] - pT
+B
+
+uP <- pT * Descomposición$figure + B
+lP <- pT * Descomposición$figure - B
+
+Tr <- pT * Descomposición$figure
+```
+
+Se están generando predicciones futuras de la serie de tiempo ajustadas por estacionalidad. Primero, se crea un conjunto de nuevos valores de tiempo (meses) que corresponden a los periodos futuros para los cuales queremos predecir. Luego, usando el modelo lineal ajustado a la serie desestacionalizada (mod1), se calculan las predicciones puntuales de la tendencia (pT) y, a partir de estas, se obtiene el margen de error superior (B) que define la amplitud de los intervalos de predicción. Posteriormente, se incorporan nuevamente los factores estacionales de la serie original multiplicando las predicciones de la tendencia por la componente estacional (Descomposición$figure), generando así la predicción ajustada Tr. Finalmente, se calculan los límites superior (uP) e inferior (lP) del intervalo de predicción ajustado, sumando y restando el margen B a la predicción estacionalizada, de manera que se obtienen tanto las predicciones puntuales como el rango dentro del cual es probable que se encuentren los valores futuros de la serie.
+
+```{r}
+y4 <- c(352, 445, 453, 541, 457, 762, 1194, 1361, 1615, 1059, 824, 495)
+
+C <- data.frame(y = y, lP = NA, uP = NA, yh = NA)
+P <- data.frame(y = y4, lP = lP, uP = uP, yh = Tr)
+F <- rbind(C, P)
+```
+
+Se comparan las predicciones ajustadas por estacionalidad con los valores realmente observados de los meses futuros. Primero, se crean dos data frames: uno con los datos históricos y columnas vacías para predicciones e intervalos, y otro con los valores futuros junto con la predicción puntual (Tr) y los límites inferior y superior del intervalo de predicción ajustado (lP y uP). Luego se grafican los valores futuros, superponiendo las líneas rojas que representan los límites del intervalo de predicción y la línea verde que muestra la predicción puntual, lo que permite evaluar visualmente qué tan cercanas están las predicciones a los valores reales y si se encuentran dentro del rango esperado. Finalmente, se realiza un gráfico de la serie completa combinando histórico y futuro, para observar en un solo gráfico la evolución de la serie, las predicciones y la confiabilidad del modelo.
+
+
+```{r}
+plot(F$y, type = "l", xlab = "Tiempo")
+lines(F$lP, col = "red", lwd = 2)
+lines(F$uP, col = "red", lwd = 2)
+lines(F$yh, col = "green")
+
+plot(P$y, type = "l", xlab = "Tiempo")
+lines(P$lP, col = "red", lwd = 2)
+lines(P$uP, col = "red", lwd = 2)
+lines(P$yh, col = "green")
+```
+
+Esta primera gráfica de la serie completa combina el historial de ventas observadas de Taste Cola (línea negra) con la proyección futura de 12 meses (a partir del índice 37). La predicción puntual (línea verde) y su intervalo de confianza al 95% (líneas rojas) replican con fidelidad el patrón observado, que se caracteriza por una marcada estacionalidad con picos altos anuales y una tendencia de crecimiento subyacente. La continuación de esta tendencia se evidencia en que el pico proyectado es superior al máximo histórico, lo que confirma un crecimiento estructural de la demanda. La estrechez del intervalo entre los límites de predicción (líneas rojas) es notable y sugiere que el modelo de pronóstico tiene una alta precisión y confiabilidad.
+
+# Conclusión
+
+El análisis de descomposición multiplicativa confirma que la dinámica de ventas de Taste Cola está impulsada principalmente por dos factores: una fuerte estacionalidad con picos de ventas pronunciados en los meses de verano y caídas en invierno, y un crecimiento estructural y sostenido de la demanda, revelado por la tendencia ascendente. Dado que el componente irregular es mínimo y el modelo de regresión de tendencia desestacionalizada mostró una precisión excepcional, el pronóstico generado es altamente fiable. En síntesis, se proyecta que las ventas continuarán con sus marcados ciclos estacionales, pero cada pico anual se alcanzará en un nivel general progresivamente superior, consolidando la trayectoria de crecimiento de la marca.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
