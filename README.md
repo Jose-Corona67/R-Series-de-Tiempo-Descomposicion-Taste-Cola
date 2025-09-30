@@ -1,4 +1,4 @@
-# R-Series-de-Tiempo-Descomposici-n-Taste-Cola
+# R-Series-de-Tiempo-Descomposicion-Taste-Cola
 
 ## Descripción
 
